@@ -2,6 +2,7 @@
 # This file should parse all configurations within the bot
 
 import discord
+from discord import Color
 import json
 
 # Read data from JSON file in ./data/config.json
@@ -48,6 +49,18 @@ def get_status():
             data.get('link')
             )
 
+# Get colors from colorscheme
+def get_color(color):
+    data = read_data()
+
+    if data is False or data.get('status') is False:
+        raise Exception("Missing config data: color")
+
+    # Grab color
+    string_value = data.get("colorscheme").get(color)
+    hex_value = Color.from_str(string_value)
+    return hex_value
+
 
 # Taking JSON variables and converting them into a presence
 # Use None url incase not provided
@@ -63,7 +76,7 @@ def translate_status(status_type, status_text, status_url=None):
         return discord.Activity(
                 type=discord.ActivityType.streaming,
                 name=status_text,
-                url=status_link
+                url=status_url
                 )
 
     elif status_type == "listening":

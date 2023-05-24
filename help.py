@@ -1,23 +1,76 @@
+from collections.abc import Mapping
+from typing import List
 import discord
+from discord.app_commands import Command
 from discord.ext import commands
+from discord.ext.commands.cog import Cog
+import config
 
-class AstroHelp(commands.HelpCommand):
+class AstroHelp(commands.MinimalHelpCommand):
 
-    # Help regular
-    async def send_bot_help(self, mapping):
-        await self.context.send("This is help")
+    def __init__(self):
+        super().__init__()
+        self.command_attrs = {
+                'name': "help",
+                'aliases': ["commands", "?"],
+                'cooldown': commands.CooldownMapping.from_cooldown(2, 5.0, commands.BucketType.user)
+                }
 
 
-    # Help with specific command
+    # Called when using help no args
+    async def send_bot_help(self, mapping: Mapping[Cog, List[Command]]):
+
+        # Our embed message
+        embed = discord.Embed(
+                title="Help",
+                color=config.get_color("main"))
+        embed.add_field(name="",
+                        value="Use `help <command>` or `help <category>` for more details",
+                        inline=False)
+
+        embed.set_footer(text=f"Prefix: {self.context.prefix}")
+
+        # grabs iterable of (Cog, list[Command])
+        for cog, commands in mapping.items():
+            
+            # Grab commands only the user can access
+            # Safe to ignore warning
+            filtered = await self.filter_commands(commands, sort=True)
+
+            # For each command we grab the signature
+            command_signatures = [
+                    # Rmove prefix and format command name
+                    f"``{self.get_command_signature(c)[1:]}``" for c in filtered]
+
+            # Check if cog has any commands
+            if command_signatures:
+
+                # Use get incase cog is None
+                cog_name = getattr(cog, "name", "No Category")
+
+                # Add cog section to help message
+                embed.add_field(
+                        name=f"{cog_name}",
+                        value="\n".join(command_signatures),
+                        inline=True)
+
+        # Display message
+        channel = self.get_destination()
+        await channel.send(embed=embed)
+
+
+    # Help for specific command
     async def send_command_help(self, command):
-        await self.context.send(f"You asked for help with: {command}")
 
+        embed = discord.Embed(
+                title=self.get_command_signature(command)[1:],
+                color=config.get_color("main"))
+        embed.set_footer(text=f"Prefix: {self.context.prefix}")
+        embed.add_field(name="Description", value=command.help)
 
-    # Help for a group
-    async def send_group_help(self, group):
-        await self.context.send(f"This is a group: {group}")
+        alias = command.aliases
+        if alias:
+            embed.add_field(name="Aliases", value=", ".join(alias), inline=False)
 
-
-    # Help for cog
-    async def send_cog_help(self, cog):
-        await self.context.send(f"This is a cog: {cog}")
+        channel = self.get_destination()
+        await channel.send(embed=embed)
