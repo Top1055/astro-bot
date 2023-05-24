@@ -2,9 +2,12 @@ import discord
 from discord.ext import commands
 from discord.ext.commands.context import Context
 import cogs.music.util as util
+import cogs.music.queue as queue
 
 import datetime
 import pytz
+
+import yt_dlp
 
 from cogs.music.help import music_help
 
@@ -38,4 +41,33 @@ class music(commands.Cog):
         await util.join_vc(ctx)
         await ctx.message.add_reaction('👍')
 
+    
+    @commands.command(
+            help="Leaves the voice chat if the bot is present",
+            aliases=['disconnect'])
+    async def leave(self, ctx: Context):
+        await util.leave_vc(ctx)
+        await ctx.message.add_reaction('👍')
 
+    @commands.command(
+            help="Queues a song into the bot",
+            aliases=['p', 'qeue', 'q'])
+    async def play(self, ctx: Context, *, url=None):
+        if url is None:
+            raise commands.CommandError("Must provide a link or search query")
+
+        await util.join_vc(ctx)
+
+        ydl_opts = {
+            'format': 'bestaudio/best',
+            'outtmpl': 'downloads/%(title)s.%(ext)s',
+        }
+
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            info = ydl.extract_info(url, download=True)
+            filename = ydl.prepare_filename(info)
+
+        ctx.voice_client.play(discord.FFmpegPCMAudio(executable="ffmpeg", source=filename), after=self.test)
+
+    def test(self, error):
+        print("Hello")

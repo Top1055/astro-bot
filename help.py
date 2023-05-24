@@ -74,3 +74,8 @@ class AstroHelp(commands.MinimalHelpCommand):
 
         channel = self.get_destination()
         await channel.send(embed=embed)
+
+# TODO add error support see
+# https://gist.github.com/InterStella0/b78488fb28cadf279dfd3164b9f0cf96
+# and
+# https://gist.github.com/EvieePy/7822af90858ef65012ea500bcecf1612

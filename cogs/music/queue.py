@@ -12,6 +12,7 @@ def initialize_tables():
     # Create servers table if it doesn't exist
     cursor.execute('''CREATE TABLE IF NOT EXISTS servers (
                         server_id TEXT PRIMARY KEY,
+                        is_playing INTEGER DEFAULT 0,
                     )''')
 
     # Create queue table if it doesn't exist
@@ -35,6 +36,8 @@ def add_song(server_id, song_link, queued_by):
     conn = sqlite3.connect(db_path)
     cursor = conn.cursor()
 
+    add_server(server_id, cursor, conn)
+
     # Grab current index
     cursor.execute(f"""
                    SELECT MAX(index)
@@ -56,7 +59,7 @@ def add_song(server_id, song_link, queued_by):
 
 
 # Add server to db if first time queuing
-def add_server(server_id, cursor):
+def add_server(server_id, cursor, conn):
     # Check if the server exists
     cursor.execute('''SELECT COUNT(*)
                    FROM servers
@@ -69,6 +72,7 @@ def add_server(server_id, cursor):
     if not server_exists:
         cursor.execute('''INSERT INTO servers (server_id)
                        VALUES (?)''', (server_id,))
+        conn.commit()
 
 
 # set song as played and update indexes
@@ -102,3 +106,45 @@ def mark_song_as_finished(server_id, order_num):
     # Close connection
     conn.commit()
     conn.close()
+
+
+# Sets the playing variable in a server to true or false
+def update_server(server_id, playing: bool):
+    # Connect to database
+    conn = sqlite3.connect(db_path)
+    cursor = conn.cursor()
+
+    # add server to db if not present
+    add_server(server_id, cursor, conn)
+
+    value = 1 if playing else 0
+
+    # Update field
+    cursor.execute("""UPDATE servers
+                   SET is_playing = ?
+                   WHERE server_id = ?
+                   """, (value, server_id))
+
+    # Close connection
+    conn.commit()
+    conn.close()
+
+def is_server_playing(server_id):
+    # Connect to db
+    conn = sqlite3.connect(db_path)
+    cursor = conn.cursor()
+
+    # add server to db if not present
+    add_server(server_id, cursor, conn)
+
+    cursor.execute("""SELECT is_playing
+                   FROM servers
+                   WHERE server_id = ?""",
+                   (server_id,))
+
+    result = cursor.fetchone()
+
+    conn.commit()
+    conn.close()
+
+    return result
