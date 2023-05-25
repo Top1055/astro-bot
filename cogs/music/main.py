@@ -11,6 +11,11 @@ import yt_dlp
 
 from cogs.music.help import music_help
 
+ydl_opts = {
+        'format': 'bestaudio/best',
+        'outtmpl': 'downloads/%(title)s.%(ext)s',
+}
+
 class music(commands.Cog):
     def __init__(self, client):
         self.client = client
@@ -21,6 +26,7 @@ class music(commands.Cog):
         help_command = music_help()
         help_command.cog = self
         self.help_command = help_command
+
 
     @commands.command(
             help="Displays latency from the bot",
@@ -49,6 +55,7 @@ class music(commands.Cog):
         await util.leave_vc(ctx)
         await ctx.message.add_reaction('👍')
 
+
     @commands.command(
             help="Queues a song into the bot",
             aliases=['p', 'qeue', 'q'])
@@ -56,18 +63,16 @@ class music(commands.Cog):
         if url is None:
             raise commands.CommandError("Must provide a link or search query")
 
+
         await util.join_vc(ctx)
 
-        ydl_opts = {
-            'format': 'bestaudio/best',
-            'outtmpl': 'downloads/%(title)s.%(ext)s',
-        }
 
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             info = ydl.extract_info(url, download=True)
             filename = ydl.prepare_filename(info)
 
         ctx.voice_client.play(discord.FFmpegPCMAudio(executable="ffmpeg", source=filename), after=self.test)
+
 
     def test(self, error):
         print("Hello")
