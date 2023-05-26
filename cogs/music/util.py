@@ -1,5 +1,3 @@
-import discord
-from discord.ext import commands
 from discord.ext.commands.context import Context
 from discord.ext.commands.converter import CommandError
 
@@ -45,3 +43,8 @@ async def leave_vc(ctx: Context):
 
     # Disconnect
     await ctx.voice_client.disconnect(force=False)
+
+
+# Check if command was entered in a server
+async def in_server(ctx: Context):
+    return ctx.guild != None 
