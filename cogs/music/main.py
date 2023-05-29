@@ -7,6 +7,7 @@ import cogs.music.translate as translate
 
 import datetime
 import pytz
+import asyncio
 
 from cogs.music.help import music_help
 
@@ -55,27 +56,96 @@ class music(commands.Cog):
 
     @commands.command(
             help="Queues a song into the bot",
-            aliases=['p', 'qeue', 'q'])
-    @commands.check(util.in_server)
+            aliases=['p'])
     async def play(self, ctx: Context, *, url=None):
         if url is None:
             raise commands.CommandError("Must provide a link or search query")
+        elif ctx.guild is None:
+            raise commands.CommandError("Command must be issued in a server")
 
         server = ctx.guild.id
 
-        #TODO potentially save requests before getting stream link
-        audio = translate.main(url)
+        await ctx.message.add_reaction('👍')
+        await util.join_vc(ctx)
+
+        msg = await ctx.send("Fetching song(s)...")
+        async with ctx.typing():
+            #TODO potentially save requests before getting stream link
+            # Grab video details such as title thumbnail duration
+            audio = translate.main(url)
+
+        await msg.delete()
+
+        if len(audio) == 0:
+            await ctx.message.add_reaction('🚫')
+            await ctx.send("Failed to find song!")
+            return
+
 
         #TODO make sure user isn't queuing in dm for some stupid reason
         for song in audio:
-           await queue.add_song(server, song, ctx.author.id)
+           song['position'] = await queue.add_song(
+                   server,
+                   song,
+                   ctx.author.display_name)
 
-        await ctx.message.add_reaction('👍')
+        await util.queue_message(ctx, audio[0])
 
-        await util.join_vc(ctx)
 
-        if await queue.is_server_playing(ctx.guild.id):
+        if await queue.is_server_playing(server):
             return
 
         await queue.update_server(server, True)
         await queue.play(ctx)
+
+
+
+    @commands.command(
+            help="Display the current music queue",
+            aliases=['q', 'songs'])
+    async def queue(self, ctx: Context):
+
+        server = ctx.guild
+
+        # Perform usual checks
+        if server is None:
+            raise commands.CommandError("Command must be issued in a server")
+
+
+        # Grab all songs from this server
+        n, songs = await queue.grab_songs(server.id)
+
+        # Check once more
+        if len(songs) == 0:
+            await ctx.send("🚫 This server has no queue currently. Start the party by queuing up a song!")
+            return
+
+        # Display songs
+        await util.display_server_queue(ctx, songs, n)
+
+    
+    @commands.command(
+            help="Skips the current song that is playing, can include number to skip more songs",
+            aliases=['s'])
+    async def skip(self, ctx: Context, n='1'):
+        server = ctx.guild
+
+        if server is None:
+            raise commands.CommandError("Command must be issued in a server")
+
+        if ctx.voice_client is None:
+            raise commands.CommandError("I'm not in a voice channel")
+
+        if not n.isdigit():
+            raise commands.CommandError("Please enter a number to skip")
+        n = int(n)
+
+        if n <= 0:
+            raise commands.CommandError("Please enter a positive number")
+
+        # Skip specificed number of songs
+        for _ in range(n-1):
+            await queue.pop(server.id)
+
+        # Safe to ignore error for now
+        ctx.voice_client.stop()

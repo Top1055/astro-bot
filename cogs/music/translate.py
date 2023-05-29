@@ -6,6 +6,7 @@ ydl_opts = {
         'format':           'bestaudio/best',
         'quiet':            True,
         'default_search':   'ytsearch',
+        'ignoreerrors':     True,
 }
 
 def main(url):
@@ -41,9 +42,19 @@ def main(url):
 
 def search_song(search):
     with ytdlp.YoutubeDL(ydl_opts) as ydl:
-        info = ydl.extract_info(f"ytsearch1:{search}", download=False)
-        audio_url = info['entries'][0]['url'] # Get audio stream URL
-    return [audio_url]
+        try:
+           info = ydl.extract_info(f"ytsearch1:{search}", download=False)
+        except:
+            return []
+    if info is None:
+        return []
+
+    info = info['entries'][0] # Get audio stream URL
+    data = {'url':          info['url'],
+            'title':        info['title'],
+            'thumbnail':    info['thumbnail'],
+            'duration':     info['duration']} # Grab data
+    return [data]
 
 
 def spotify_song(url):
@@ -56,10 +67,39 @@ def spotify_playlist(url):
 
 def song_download(url):
     with ytdlp.YoutubeDL(ydl_opts) as ydl:
-        info = ydl.extract_info(url, download=False)
-        audio_url = info['url'] # Get audio stream URL
-    return [audio_url]
+        try:
+            info = ydl.extract_info(url, download=False)
+        except:
+            return []
+    if info is None:
+        return []
+
+    print(info.keys())
+
+    data = {'url':          info['url'],
+            'title':        info['title'],
+            'thumbnail':    info['thumbnail'],
+            'duration':     info['duration']} # Grab data
+    return [data]
 
 
 def playlist_download(url):
-    return []
+    with ytdlp.YoutubeDL(ydl_opts) as ydl:
+        try:
+            info = ydl.extract_info(url, download=False)
+        except:
+            return []
+    if info is None:
+        return []
+
+    info = info['entries'] # Grabbing all songs in playlist
+    urls = []
+
+    for song in info:
+        data = {'url':          song['url'],
+                'title':        song['title'],
+                'thumbnail':    song['thumbnail'],
+                'duration':     song['duration']} # Grab data
+        urls.append(data)
+
+    return urls

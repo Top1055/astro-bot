@@ -1,5 +1,7 @@
+import discord
 from discord.ext.commands.context import Context
 from discord.ext.commands.converter import CommandError
+import config
 
 
 # Joining/moving to the user's vc in a guild
@@ -45,6 +47,48 @@ async def leave_vc(ctx: Context):
     await ctx.voice_client.disconnect(force=False)
 
 
-# Check if command was entered in a server
-async def in_server(ctx: Context):
-    return ctx.guild != None 
+# Build a display message for queuing a new song
+async def queue_message(ctx: Context, data: dict):
+    msg = discord.Embed(
+            title=f"{ctx.author.display_name} queued a song!",
+            color=config.get_color("main"))
+
+    msg.set_thumbnail(url=data['thumbnail'])
+    msg.add_field(name=data['title'],
+                  value=f"Duration: {format_time(data['duration'])}" + '\n'
+                  + f"Position: {data['position']}")
+
+    await ctx.send(embed=msg)
+
+
+# Build an embed message that shows the queue
+async def display_server_queue(ctx: Context, songs, n):
+    server = ctx.guild
+
+    msg = discord.Embed(
+            title=f"{server.name}'s Queue!",
+            color=config.get_color("main"))
+
+    display = ""
+    for i, song in enumerate(songs):
+        display += f"``{i + 1}.`` {song[0]} - {format_time(song[1])} Queued by {song[2]}\n"
+    msg.add_field(name="Songs:",
+                  value=display,
+                  inline=True)
+    if n > 10:
+        msg.set_footer(text=f"and {n - 10} more!..")
+
+    await ctx.send(embed=msg)
+
+
+# Converts seconds into more readable format
+def format_time(seconds):
+    minutes, seconds = divmod(seconds, 60)
+    hours, minutes = divmod(minutes, 60)
+
+    if hours > 0:
+        return f"{hours}:{minutes:02d}:{seconds:02d}"
+    elif minutes > 0:
+        return f"{minutes}:{seconds:02d}"
+    else:
+        return f"{seconds} seconds"

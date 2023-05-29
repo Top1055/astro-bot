@@ -29,17 +29,21 @@ def initialize_tables():
     cursor.execute("UPDATE servers SET is_playing = 0;")
 
     # Create queue table if it doesn't exist
-    cursor.execute('''CREATE TABLE IF NOT EXISTS queue (
+    cursor.execute('''CREATE TABLE IF NOT EXISTS songs (
                         server_id TEXT NOT NULL,
                         song_link TEXT,
                         queued_by TEXT,
                         position INTEGER NOT NULL,
-                        has_played INTEGER DEFAULT 0,
+
+                        title TEXT,
+                        thumbnail TEXT,
+                        duration INTEGER,
+
                         PRIMARY KEY (position),
                         FOREIGN KEY (server_id) REFERENCES servers(server_id)
                     );''')
     # Clear all entries
-    cursor.execute("DELETE FROM queue;")
+    cursor.execute("DELETE FROM songs;")
 
     # Commit the changes and close the connection
     conn.commit()
@@ -47,7 +51,7 @@ def initialize_tables():
 
 
 # Queue a song in the db
-async def add_song(server_id, song_link, queued_by):
+async def add_song(server_id, details, queued_by):
     # Connect to db
     conn = sqlite3.connect(db_path)
     cursor = conn.cursor()
@@ -57,12 +61,26 @@ async def add_song(server_id, song_link, queued_by):
     max_order_num = await get_max(server_id, cursor) + 1
 
     cursor.execute("""
-                   INSERT INTO queue (server_id, song_link, queued_by, position)
-                   VALUES (?, ?, ?, ?)
-                   """, (server_id, song_link, queued_by, max_order_num))
+                   INSERT INTO songs (server_id,
+                                     song_link,
+                                     queued_by,
+                                     position,
+                                     title,
+                                     thumbnail,
+                                     duration)
+                   VALUES (?, ?, ?, ?, ?, ?, ?)
+                   """, (server_id,
+                         details['url'],
+                         queued_by,
+                         max_order_num,
+                         details['title'],
+                         details['thumbnail'],
+                         details['duration']))
 
     conn.commit()
     conn.close()
+
+    return max_order_num
 
 
 # Add server to db if first time queuing
@@ -89,7 +107,7 @@ async def mark_song_as_finished(server_id, order_num):
     cursor = conn.cursor()
 
     # Update the song as finished
-    cursor.execute('''DELETE FROM queue
+    cursor.execute('''DELETE FROM songs
                    WHERE server_id = ? AND position = ?''',
                    (server_id, order_num))
 
@@ -102,7 +120,7 @@ async def mark_song_as_finished(server_id, order_num):
 async def get_max(server_id, cursor):
     cursor.execute(f"""
                    SELECT MAX(position)
-                   FROM queue
+                   FROM songs
                    WHERE server_id = ?
                    """, (server_id,))
     result = cursor.fetchone()
@@ -129,7 +147,7 @@ async def pop(server_id):
         return None
 
     cursor.execute('''SELECT song_link
-                   FROM queue
+                   FROM songs
                    WHERE server_id = ? AND position = ?
                    ''', (server_id, max_order))
     result = cursor.fetchone()
@@ -178,7 +196,6 @@ async def is_server_playing(server_id):
                    (server_id,))
 
     result = cursor.fetchone()
-    print(result)
 
     conn.commit()
     conn.close()
@@ -196,19 +213,42 @@ async def clear(server_id):
     await update_server(server_id, False)
 
     # Delete all songs from the server
-    cursor.execute('''DELETE FROM queue WHERE server_id = ?''', (server_id,))
+    cursor.execute('''DELETE FROM songs WHERE server_id = ?''', (server_id,))
 
     conn.commit()
     conn.close()
+
+
+# Grabs all songs from a server for display purposes
+async def grab_songs(server_id):
+    # Connect to db
+    conn = sqlite3.connect(db_path)
+    cursor = conn.cursor()
+
+    await add_server(server_id, cursor, conn)
+
+    # Grabs all songs from the server
+    cursor.execute('''SELECT title, duration, queued_by
+                   FROM songs
+                   WHERE server_id = ?
+                   ORDER BY position
+                   LIMIT 10''', (server_id,))
+    songs = cursor.fetchall()
+    max = await get_max(server_id, cursor)
+
+    conn.commit()
+    conn.close()
+
+    return max, songs
 
 
 # Play and loop songs in server
 async def play(ctx):
     server_id = ctx.guild.id
 
-    # Wait until song is stopped playing 
-    #while ctx.voice_client.is_playing():
-        #await asyncio.sleep(1)
+    # Wait until song is stopped playing fully
+    while ctx.voice_client.is_playing():
+        await asyncio.sleep(1)
 
     # check next song
     url = await pop(server_id)
@@ -222,11 +262,12 @@ async def play(ctx):
     ctx.voice_client.play(
             AstroPlayer(ctx, url, FFMPEG_OPTS))
 
+# call play on ffmpeg exit
 class AstroPlayer(discord.FFmpegPCMAudio):
     def __init__(self, ctx, source, options) -> None:
         self.ctx = ctx
         super().__init__(source, **options)
 
     def _kill_process(self):
-        super()._kill_process
-        asyncio.run(play(self.ctx))
+        super()._kill_process()
+        asyncio.create_task(play(self.ctx))
