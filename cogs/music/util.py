@@ -2,7 +2,7 @@ import discord
 from discord.ext.commands.context import Context
 from discord.ext.commands.converter import CommandError
 import config
-
+from . import queue
 
 # Joining/moving to the user's vc in a guild
 async def join_vc(ctx: Context):
@@ -69,7 +69,7 @@ async def display_server_queue(ctx: Context, songs, n):
             title=f"{server.name}'s Queue!",
             color=config.get_color("main"))
 
-    display = ""
+    display = f"🔊 Currently playing: ``{await queue.get_current_song(ctx.guild.id)}``\n"
     for i, song in enumerate(songs):
         display += f"``{i + 1}.`` {song[0]} - {format_time(song[1])} Queued by {song[2]}\n"
     msg.add_field(name="Songs:",

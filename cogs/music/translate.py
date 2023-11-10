@@ -1,6 +1,7 @@
 # Handles translating urls and search terms
 
 import yt_dlp as ytdlp
+import spotipy
 
 ydl_opts = {
         'format':           'bestaudio/best',
@@ -9,7 +10,7 @@ ydl_opts = {
         'ignoreerrors':     True,
 }
 
-def main(url):
+def main(url, sp):
 
     #url = url.lower()
 
@@ -20,13 +21,13 @@ def main(url):
     #TODO add better regex or something
     if 'spotify' in url:
         if 'track' in url:
-            return spotify_song(url)
+            return spotify_song(url, sp)
         elif 'playlist' in url:
             return spotify_playlist(url)
 
     soundcloud_song = 'soundcloud' in url and 'sets' not in url
     # Not implemented yet
-    #soundcloud_playlist = 'soundcloud' in url and 'sets' in url
+    # soundcloud_playlist = 'soundcloud' in url and 'sets' in url
 
     youtube_song = 'watch?v=' in url or 'youtu.be/' in url
     youtube_playlist = 'playlist?list=' in url
@@ -57,8 +58,21 @@ def search_song(search):
     return [data]
 
 
-def spotify_song(url):
-    return []
+def spotify_song(url, sp):
+        track = sp.track(url.split("/")[-1].split("?")[0])
+        search = ""
+
+        for i in track["artists"]:
+            # grabs all the artists name's if there's more than one
+            search = search + (i['name'] + ", ")
+
+        # remove last comma
+        search = search[:-2]
+
+        # set search to name
+        query = search + " - " + track['name']
+
+        return search_song(query)
 
 
 def spotify_playlist(url):
@@ -73,8 +87,6 @@ def song_download(url):
             return []
     if info is None:
         return []
-
-    print(info.keys())
 
     data = {'url':          info['url'],
             'title':        info['title'],

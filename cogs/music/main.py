@@ -5,12 +5,49 @@ import cogs.music.util as util
 import cogs.music.queue as queue
 import cogs.music.translate as translate
 
-import datetime
-import pytz
-import asyncio
 
 from cogs.music.help import music_help
+import discord
 
+import spotipy
+from spotipy.oauth2 import SpotifyClientCredentials
+
+
+# Fix this pls
+
+import json
+#from .. import config
+# Read data from JSON file in ./data/config.json
+def read_data():
+    with open("./data/config.json", "r") as file:
+        return json.load(file)
+
+    raise Exception("Could not load config data")
+
+
+def get_spotify_creds():
+    data = read_data()
+    data = data.get("spotify")
+
+    SCID = data.get("SCID")
+    secret = data.get("SECRET")
+
+    return SCID, secret
+
+
+
+
+
+
+# call play on ffmpeg exit
+class AstroPlayer(discord.FFmpegPCMAudio):
+    def __init__(self, ctx, source, options) -> None:
+        #self.ctx = ctx
+        super().__init__(source, **options)
+
+    def _kill_process(self):
+        super()._kill_process()
+        #asyncio.create_task(play(self.ctx))
 
 class music(commands.Cog):
     def __init__(self, client):
@@ -23,19 +60,14 @@ class music(commands.Cog):
         help_command.cog = self
         self.help_command = help_command
 
+        SCID, secret = get_spotify_creds()
+        # Authentication - without user
+        client_credentials_manager = SpotifyClientCredentials(client_id=SCID,
+                                                      client_secret=secret)
+
+        self.sp = spotipy.Spotify(client_credentials_manager=client_credentials_manager)
+
         queue.initialize_tables()
-
-
-    @commands.command(
-            help="Displays latency from the bot",
-            aliases=['delay'])
-    async def ping(self, ctx: Context):
-        start_time = datetime.datetime.now(pytz.utc)
-        end_time = ctx.message.created_at
-
-        delay = int((end_time - start_time).total_seconds() * 1000)
-
-        await ctx.send(f"Pong! `{delay}MS`")
 
 
     @commands.command(
@@ -53,7 +85,6 @@ class music(commands.Cog):
         await util.leave_vc(ctx)
         await ctx.message.add_reaction('👍')
 
-
     @commands.command(
             help="Queues a song into the bot",
             aliases=['p'])
@@ -65,14 +96,14 @@ class music(commands.Cog):
 
         server = ctx.guild.id
 
-        await ctx.message.add_reaction('👍')
         await util.join_vc(ctx)
+        await ctx.message.add_reaction('👍')
 
         msg = await ctx.send("Fetching song(s)...")
         async with ctx.typing():
             #TODO potentially save requests before getting stream link
             # Grab video details such as title thumbnail duration
-            audio = translate.main(url)
+            audio = translate.main(url, self.sp)
 
         await msg.delete()
 
@@ -99,7 +130,6 @@ class music(commands.Cog):
         await queue.play(ctx)
 
 
-
     @commands.command(
             help="Display the current music queue",
             aliases=['q', 'songs'])
@@ -116,7 +146,7 @@ class music(commands.Cog):
         n, songs = await queue.grab_songs(server.id)
 
         # Check once more
-        if len(songs) == 0:
+        if len(songs) == 0 and await queue.is_server_playing(ctx.guild.id) == False:
             await ctx.send("🚫 This server has no queue currently. Start the party by queuing up a song!")
             return
 

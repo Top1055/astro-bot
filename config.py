@@ -13,6 +13,16 @@ def read_data():
     raise Exception("Could not load config data")
 
 
+def get_spotify_creds():
+    data = read_data()
+    data = data.get("spotify")
+
+    SCID = data.get("SCID")
+    secret = data.get("SECRET")
+
+    return SCID, secret
+
+
 # Reading prefix
 def get_prefix():
     data = read_data()

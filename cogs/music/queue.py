@@ -1,3 +1,4 @@
+from http import server
 import sqlite3
 
 import discord
@@ -22,7 +23,8 @@ def initialize_tables():
     # Create servers table if it doesn't exist
     cursor.execute('''CREATE TABLE IF NOT EXISTS servers (
                         server_id TEXT PRIMARY KEY,
-                        is_playing INTEGER DEFAULT 0
+                        is_playing INTEGER DEFAULT 0,
+                        song_name TEXT
                     );''')
 
     # Set all to not playing
@@ -83,6 +85,34 @@ async def add_song(server_id, details, queued_by):
     return max_order_num
 
 
+# Pop song from server
+async def pop(server_id):
+    # Connect to db
+    conn = sqlite3.connect(db_path)
+    cursor = conn.cursor()
+
+    # JUST INCASE!
+    await add_server(server_id, cursor, conn)
+
+    cursor.execute('''SELECT *
+                   FROM songs
+                   WHERE server_id = ?
+                   ORDER BY position
+                   LIMIT 1;''', (server_id,))
+    result = cursor.fetchone()
+
+    conn.commit()
+    conn.close()
+
+    if result == None:
+        return None
+
+    await set_current_song(server_id, result[4])
+    await mark_song_as_finished(server_id, result[3])
+
+    return result[1]
+
+
 # Add server to db if first time queuing
 async def add_server(server_id, cursor, conn):
     # Check if the server exists
@@ -116,6 +146,42 @@ async def mark_song_as_finished(server_id, order_num):
     conn.close()
 
 
+# set the current playing song of the server
+async def set_current_song(server_id, title):
+    # Connect to the database
+    conn = sqlite3.connect(db_path)
+    cursor = conn.cursor()
+
+    cursor.execute(''' UPDATE servers
+                    SET song_name = ?
+                    WHERE server_id = ?''',
+                   (title, server_id))
+
+    # Close connection
+    conn.commit()
+    conn.close()
+
+
+async def get_current_song(server_id):
+    # Connect to the database
+    conn = sqlite3.connect(db_path)
+    cursor = conn.cursor()
+
+    cursor.execute(''' SELECT song_name
+                    FROM servers
+                    WHERE server_id = ?
+                    LIMIT 1;''',
+                   (server_id,))
+    
+    result = cursor.fetchone()
+
+    # Close connection
+    conn.commit()
+    conn.close()
+
+    return result[0]
+
+
 # Grab max order from server
 async def get_max(server_id, cursor):
     cursor.execute(f"""
@@ -129,35 +195,6 @@ async def get_max(server_id, cursor):
     max_order_num = result[0] if result[0] is not None else -1
 
     return max_order_num
-
-
-# Pop song from server
-async def pop(server_id):
-    # Connect to db
-    conn = sqlite3.connect(db_path)
-    cursor = conn.cursor()
-
-    # JUST INCASE!
-    await add_server(server_id, cursor, conn)
-
-    max_order = await get_max(server_id, cursor)
-    if max_order == -1:
-        conn.commit()
-        conn.close()
-        return None
-
-    cursor.execute('''SELECT song_link
-                   FROM songs
-                   WHERE server_id = ? AND position = ?
-                   ''', (server_id, max_order))
-    result = cursor.fetchone()
-
-    conn.commit()
-    conn.close()
-
-    await mark_song_as_finished(server_id, max_order)
-
-    return result[0]
 
 
 # Sets the playing variable in a server to true or false
@@ -259,7 +296,7 @@ async def play(ctx):
         return
 
     # else play next song and call play again
-    ctx.voice_client.play(
+    await ctx.voice_client.play(
             AstroPlayer(ctx, url, FFMPEG_OPTS))
 
 # call play on ffmpeg exit
@@ -270,4 +307,4 @@ class AstroPlayer(discord.FFmpegPCMAudio):
 
     def _kill_process(self):
         super()._kill_process()
-        asyncio.create_task(play(self.ctx))
+        asyncio.run(play(self.ctx))

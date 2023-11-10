@@ -6,4 +6,4 @@ import help
 client = Astro(command_prefix=config.get_prefix(), intents=discord.Intents.all())
 client.help_command = help.AstroHelp()
 
-client.run(config.get_login("live"))
+client.run(config.get_login("dev"))

@@ -32,7 +32,7 @@ class AstroHelp(commands.MinimalHelpCommand):
 
         # grabs iterable of (Cog, list[Command])
         for cog, commands in mapping.items():
-            
+
             # Grab commands only the user can access
             # Safe to ignore warning
             filtered = await self.filter_commands(commands, sort=True)
