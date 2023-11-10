@@ -10,20 +10,20 @@ ydl_opts = {
         'ignoreerrors':     True,
 }
 
-def main(url, sp):
+async def main(url, sp):
 
     #url = url.lower()
 
     # Check if link or search
     if url.startswith("https://") is False:
-        return search_song(url)
+        return await search_song(url)
 
     #TODO add better regex or something
     if 'spotify' in url:
         if 'track' in url:
-            return spotify_song(url, sp)
+            return await spotify_song(url, sp)
         elif 'playlist' in url:
-            return spotify_playlist(url, sp)
+            return await spotify_playlist(url, sp)
 
     soundcloud_song = 'soundcloud' in url and 'sets' not in url
     # Not implemented yet
@@ -33,15 +33,15 @@ def main(url, sp):
     youtube_playlist = 'playlist?list=' in url
 
     if soundcloud_song or youtube_song:
-        return song_download(url)
+        return await song_download(url)
 
     if youtube_playlist:
-        return playlist_download(url)
+        return await playlist_download(url)
 
     return []
 
 
-def search_song(search):
+async def search_song(search):
     with ytdlp.YoutubeDL(ydl_opts) as ydl:
         try:
            info = ydl.extract_info(f"ytsearch1:{search}", download=False)
@@ -58,7 +58,7 @@ def search_song(search):
     return [data]
 
 
-def spotify_song(url, sp):
+async def spotify_song(url, sp):
         track = sp.track(url.split("/")[-1].split("?")[0])
         search = ""
 
@@ -72,10 +72,10 @@ def spotify_song(url, sp):
         # set search to name
         query = search + " - " + track['name']
 
-        return search_song(query)
+        return await search_song(query)
 
 
-def spotify_playlist(url, sp):
+async def spotify_playlist(url, sp):
     # Get the playlist uri code
     code = url.split("/")[-1].split("?")[0]
 
@@ -99,17 +99,27 @@ def spotify_playlist(url, sp):
         # Remove last column
         search = search[:-2]
         search += f" - {track['track']['name']}"
+        songs.append(search)
 
-        searched_result = search_song(search)
-        if searched_result == []:
+        #searched_result = search_song(search)
+        #if searched_result == []:
+            #continue
+
+        #songs.append(searched_result[0])
+    
+    while True:
+        search_result = await search_song(songs[0])
+        if search_result == []:
+            songs.pop(0)
             continue
-
-        songs.append(searched_result[0])
+        else:
+            songs[0] = search_result[0]
+            break
     
     return songs
 
 
-def song_download(url):
+async def song_download(url):
     with ytdlp.YoutubeDL(ydl_opts) as ydl:
         try:
             info = ydl.extract_info(url, download=False)
@@ -125,7 +135,7 @@ def song_download(url):
     return [data]
 
 
-def playlist_download(url):
+async def playlist_download(url):
     with ytdlp.YoutubeDL(ydl_opts) as ydl:
         try:
             info = ydl.extract_info(url, download=False)

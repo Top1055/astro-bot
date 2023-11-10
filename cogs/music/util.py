@@ -20,10 +20,12 @@ async def join_vc(ctx: Context):
 
     # Join or move to the user's vc
     if ctx.voice_client is None:
-        await vc.connect()
+        vc = await vc.connect()
     else:
         # Safe to ignore type error for now
-        await ctx.voice_client.move_to(vc)
+        vc = await ctx.voice_client.move_to(vc)
+    
+    return vc
 
 
 # Leaving the voice channel of a user
@@ -71,7 +73,12 @@ async def display_server_queue(ctx: Context, songs, n):
 
     display = f"🔊 Currently playing: ``{await queue.get_current_song(ctx.guild.id)}``\n\n"
     for i, song in enumerate(songs):
-        display += f"``{i + 1}.`` {song[0]} - {format_time(song[1])} Queued by {song[2]}\n"
+
+        # If text is not avaialable do not display
+        time = '' if isinstance(song[1], str) else format_time(song[1])
+
+        display += f"``{i + 1}.`` {song[0]} - {time} Queued by {song[2]}\n"
+
     msg.add_field(name="Songs:",
                   value=display,
                   inline=True)

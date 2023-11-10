@@ -4,6 +4,8 @@ import sqlite3
 import discord
 import asyncio
 
+from .translate import search_song
+
 db_path = "./data/music.db"
 
 FFMPEG_OPTS = {
@@ -62,22 +64,40 @@ async def add_song(server_id, details, queued_by):
 
     max_order_num = await get_max(server_id, cursor) + 1
 
-    cursor.execute("""
-                   INSERT INTO songs (server_id,
-                                     song_link,
-                                     queued_by,
-                                     position,
-                                     title,
-                                     thumbnail,
-                                     duration)
-                   VALUES (?, ?, ?, ?, ?, ?, ?)
-                   """, (server_id,
-                         details['url'],
-                         queued_by,
-                         max_order_num,
-                         details['title'],
-                         details['thumbnail'],
-                         details['duration']))
+    if isinstance(details, str):
+        cursor.execute("""
+                    INSERT INTO songs (server_id,
+                                        song_link,
+                                        queued_by,
+                                        position,
+                                        title,
+                                        thumbnail,
+                                        duration)
+                    VALUES (?, ?, ?, ?, ?, ?, ?)
+                    """, (server_id,
+                            "Not grabbed",
+                            queued_by,
+                            max_order_num,
+                            details,
+                            "Unkown",
+                            "Unkown"))
+    else:
+        cursor.execute("""
+                    INSERT INTO songs (server_id,
+                                        song_link,
+                                        queued_by,
+                                        position,
+                                        title,
+                                        thumbnail,
+                                        duration)
+                    VALUES (?, ?, ?, ?, ?, ?, ?)
+                    """, (server_id,
+                            details['url'],
+                            queued_by,
+                            max_order_num,
+                            details['title'],
+                            details['thumbnail'],
+                            details['duration']))
 
     conn.commit()
     conn.close()
@@ -86,7 +106,7 @@ async def add_song(server_id, details, queued_by):
 
 
 # Pop song from server
-async def pop(server_id):
+async def pop(server_id, ignore=False):
     # Connect to db
     conn = sqlite3.connect(db_path)
     cursor = conn.cursor()
@@ -106,6 +126,20 @@ async def pop(server_id):
 
     if result == None:
         return None
+    elif ignore:
+        await mark_song_as_finished(server_id, result[3])
+        return None
+    elif result[1] == "Not grabbed":
+        # Fetch song info
+        song = await search_song(result[4])
+        if song == []:
+            return None
+        else:
+            song = song[0]
+
+        await set_current_song(server_id, song['title'])
+        await mark_song_as_finished(server_id, result[3])
+        return song['url']
 
     await set_current_song(server_id, result[4])
     await mark_song_as_finished(server_id, result[3])
@@ -286,6 +320,8 @@ class AstroPlayer(discord.FFmpegPCMAudio):
 
     def _kill_process(self):
         super()._kill_process()
+        if self.ctx.voice_client.is_playing():
+            return
         asyncio.run(play(self.ctx))
 
 # Play and loop songs in server
@@ -305,5 +341,5 @@ async def play(ctx):
         return
 
     # else play next song and call play again
-    await ctx.voice_client.play(
+    ctx.voice_client.play(
             AstroPlayer(ctx, url, FFMPEG_OPTS))

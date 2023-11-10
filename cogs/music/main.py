@@ -92,7 +92,7 @@ class music(commands.Cog):
         async with ctx.typing():
             #TODO potentially save requests before getting stream link
             # Grab video details such as title thumbnail duration
-            audio = translate.main(url, self.sp)
+            audio = await translate.main(url, self.sp)
 
         await msg.delete()
 
@@ -103,8 +103,16 @@ class music(commands.Cog):
 
 
         #TODO make sure user isn't queuing in dm for some stupid reason
-        for song in audio:
-           song['position'] = await queue.add_song(
+
+        # Setup first song's position
+        audio[0]['position'] = await queue.add_song(
+                server,
+                audio[0],
+                ctx.author.display_name)
+
+        # Add any other songs
+        for song in audio[1:]:
+           await queue.add_song(
                    server,
                    song,
                    ctx.author.display_name)
@@ -164,7 +172,7 @@ class music(commands.Cog):
 
         # Skip specificed number of songs
         for _ in range(n-1):
-            await queue.pop(server.id)
+            await queue.pop(server.id, True)
 
         # Safe to ignore error for now
         ctx.voice_client.stop()
