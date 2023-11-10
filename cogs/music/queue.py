@@ -278,6 +278,15 @@ async def grab_songs(server_id):
 
     return max, songs
 
+# call play on ffmpeg exit
+class AstroPlayer(discord.FFmpegPCMAudio):
+    def __init__(self, ctx, source, options) -> None:
+        self.ctx = ctx
+        super().__init__(source, **options)
+
+    def _kill_process(self):
+        super()._kill_process()
+        asyncio.run(play(self.ctx))
 
 # Play and loop songs in server
 async def play(ctx):
@@ -298,13 +307,3 @@ async def play(ctx):
     # else play next song and call play again
     await ctx.voice_client.play(
             AstroPlayer(ctx, url, FFMPEG_OPTS))
-
-# call play on ffmpeg exit
-class AstroPlayer(discord.FFmpegPCMAudio):
-    def __init__(self, ctx, source, options) -> None:
-        self.ctx = ctx
-        super().__init__(source, **options)
-
-    def _kill_process(self):
-        super()._kill_process()
-        asyncio.run(play(self.ctx))

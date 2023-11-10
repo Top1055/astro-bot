@@ -69,7 +69,7 @@ async def display_server_queue(ctx: Context, songs, n):
             title=f"{server.name}'s Queue!",
             color=config.get_color("main"))
 
-    display = f"🔊 Currently playing: ``{await queue.get_current_song(ctx.guild.id)}``\n"
+    display = f"🔊 Currently playing: ``{await queue.get_current_song(ctx.guild.id)}``\n\n"
     for i, song in enumerate(songs):
         display += f"``{i + 1}.`` {song[0]} - {format_time(song[1])} Queued by {song[2]}\n"
     msg.add_field(name="Songs:",

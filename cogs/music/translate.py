@@ -23,7 +23,7 @@ def main(url, sp):
         if 'track' in url:
             return spotify_song(url, sp)
         elif 'playlist' in url:
-            return spotify_playlist(url)
+            return spotify_playlist(url, sp)
 
     soundcloud_song = 'soundcloud' in url and 'sets' not in url
     # Not implemented yet
@@ -75,8 +75,38 @@ def spotify_song(url, sp):
         return search_song(query)
 
 
-def spotify_playlist(url):
-    return []
+def spotify_playlist(url, sp):
+    # Get the playlist uri code
+    code = url.split("/")[-1].split("?")[0]
+
+    # Grab the tracks if the playlist is correct
+    try:
+        results = sp.playlist_tracks(code)['items']
+    except spotipy.exceptions.SpotifyException:
+        return []
+    
+     # Go through the tracks
+    songs = []
+    for track in results:
+        search = ""
+
+        # Fetch all artists
+        for artist in track['track']['artists']:
+
+            # Add all artists to search
+            search += f"{artist['name']}, "
+
+        # Remove last column
+        search = search[:-2]
+        search += f" - {track['track']['name']}"
+
+        searched_result = search_song(search)
+        if searched_result == []:
+            continue
+
+        songs.append(searched_result[0])
+    
+    return songs
 
 
 def song_download(url):

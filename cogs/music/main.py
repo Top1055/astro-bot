@@ -7,7 +7,6 @@ import cogs.music.translate as translate
 
 
 from cogs.music.help import music_help
-import discord
 
 import spotipy
 from spotipy.oauth2 import SpotifyClientCredentials
@@ -38,16 +37,6 @@ def get_spotify_creds():
 
 
 
-
-# call play on ffmpeg exit
-class AstroPlayer(discord.FFmpegPCMAudio):
-    def __init__(self, ctx, source, options) -> None:
-        #self.ctx = ctx
-        super().__init__(source, **options)
-
-    def _kill_process(self):
-        super()._kill_process()
-        #asyncio.create_task(play(self.ctx))
 
 class music(commands.Cog):
     def __init__(self, client):
